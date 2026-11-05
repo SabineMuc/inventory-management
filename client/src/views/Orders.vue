@@ -74,6 +74,46 @@
           </table>
         </div>
       </div>
+
+      <div class="card restock-orders-card">
+        <div class="card-header">
+          <h3 class="card-title">Submitted Restock Orders ({{ restockOrders.length }})</h3>
+        </div>
+
+        <div v-if="restockOrdersLoading" class="loading">Loading restock orders...</div>
+        <div v-else-if="restockOrdersError" class="error">{{ restockOrdersError }}</div>
+        <div v-else-if="restockOrders.length === 0" class="empty-state">
+          No restocking orders submitted yet.
+        </div>
+        <div v-else class="restock-orders-list">
+          <div v-for="restockOrder in restockOrders" :key="restockOrder.id" class="restock-order">
+            <div class="restock-order-header">
+              <div class="restock-order-title">
+                <strong>{{ restockOrder.order_number }}</strong>
+                <span :class="['badge', getOrderStatusClass(restockOrder.status)]">
+                  {{ restockOrder.status }}
+                </span>
+              </div>
+              <div class="restock-order-lead-time">{{ restockOrder.lead_time_days }} day lead time</div>
+            </div>
+
+            <div class="restock-order-items">
+              <div v-for="item in restockOrder.items" :key="item.item_sku" class="restock-item-entry">
+                <span class="item-name">{{ item.item_name }}</span>
+                <span class="item-meta">{{ t('orders.quantity') }}: {{ item.quantity }} @ {{ currencySymbol }}{{ item.unit_cost.toFixed(2) }}</span>
+              </div>
+            </div>
+
+            <div class="restock-order-footer">
+              <div class="restock-order-dates">
+                <span>Ordered {{ formatDate(restockOrder.order_date) }}</span>
+                <span>Expected delivery {{ formatDate(restockOrder.expected_delivery) }}</span>
+              </div>
+              <div class="restock-order-total">{{ currencySymbol }}{{ restockOrder.total_cost.toLocaleString() }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -95,6 +135,10 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const orders = ref([])
+
+    const restockOrders = ref([])
+    const restockOrdersLoading = ref(true)
+    const restockOrdersError = ref(null)
 
     // Use shared filters
     const {
@@ -129,6 +173,18 @@ export default {
       loadOrders()
     })
 
+    const loadRestockOrders = async () => {
+      try {
+        restockOrdersLoading.value = true
+        restockOrdersError.value = null
+        restockOrders.value = await api.getRestockOrders()
+      } catch (err) {
+        restockOrdersError.value = 'Failed to load restock orders: ' + err.message
+      } finally {
+        restockOrdersLoading.value = false
+      }
+    }
+
     const getOrdersByStatus = (status) => {
       return orders.value.filter(order => order.status === status)
     }
@@ -153,13 +209,19 @@ export default {
       })
     }
 
-    onMounted(loadOrders)
+    onMounted(() => {
+      loadOrders()
+      loadRestockOrders()
+    })
 
     return {
       t,
       loading,
       error,
       orders,
+      restockOrders,
+      restockOrdersLoading,
+      restockOrdersError,
       getOrdersByStatus,
       getOrderStatusClass,
       formatDate,
@@ -246,8 +308,8 @@ export default {
   margin-top: 0.5rem;
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
   padding: 0.75rem;
   z-index: 10;
   min-width: 300px;
@@ -275,5 +337,92 @@ export default {
 .item-meta {
   font-size: 0.813rem;
   color: #64748b;
+}
+
+/* Submitted Restock Orders */
+.restock-orders-card {
+  border-left: 4px solid #2563eb;
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.938rem;
+}
+
+.restock-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.restock-order {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+.restock-order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.restock-order-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.restock-order-lead-time {
+  font-weight: 700;
+  color: #2563eb;
+  font-size: 0.875rem;
+}
+
+.restock-order-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 0.75rem;
+}
+
+.restock-item-entry {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.restock-item-entry .item-name {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.restock-order-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.restock-order-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-size: 0.813rem;
+  color: #64748b;
+}
+
+.restock-order-total {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 </style>
